@@ -150,6 +150,8 @@ class ElasticApmServiceProvider extends ServiceProvider
 
             return $line >= $lineStart && $line <= $lineStop;
         })->groupBy(function ($code, $line) use ($stackTrace) {
+            // Increment line by one to fix incorrect highlights in APM
+            $line = $line +1;
             if ($line < Arr::get($stackTrace, 'line')) {
                 return 'pre_context';
             }
@@ -245,7 +247,11 @@ class ElasticApmServiceProvider extends ServiceProvider
 
     protected function listenForRedisCommands()
     {
-        Redis::enableEvents();
+        // For previously resolved connections.
+        foreach ((array) Redis::connections() as $connection) {
+            $connection->setEventDispatcher($this->app->make('events'));
+        }
+
         $this->app->events->listen(CommandExecuted::class, function (CommandExecuted $commandExecuted) {
             $stackTrace = $this->getStackTrace();
 
