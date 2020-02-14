@@ -22,7 +22,17 @@ class Transaction
         $this->timer = $timer;
     }
 
-    public function startNewSpan(string $name = null, string $type = null): Span
+    /**
+     * Start a new span
+     *
+     * @param string $name
+     * @param string $type
+     * @param string $subtype
+     * @param string $action
+     *
+     * @return Span
+     */
+    public function startNewSpan(string $name = null, string $type = null, $subtype = null, $action = null): Span
     {
         $span = new Span($this->timer, $this->collection);
 
@@ -32,6 +42,14 @@ class Transaction
 
         if (null !== $type) {
             $span->setType($type);
+        }
+
+        if (null !== $subtype) {
+            $span->setSubtype($subtype);
+        }
+
+        if (null !== $action) {
+            $span->setAction($action);
         }
 
         return $span;

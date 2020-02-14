@@ -168,6 +168,9 @@ class ElasticApmServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * @return Collection
+     */
     protected function getStackTrace(): Collection
     {
         $stackTrace = $this->stripVendorTraces(
@@ -278,52 +281,55 @@ class ElasticApmServiceProvider extends ServiceProvider
         });
     }
 
-		public static function getGuzzleMiddleware() : callable
-		{
-			return Middleware::tap(
-				function(RequestInterface $request, array $options) {
-					self::$lastHttpRequestStart = microtime(true);
-				},
-				function (RequestInterface $request, array $options, PromiseInterface $promise) {
-					// leave early if monitoring is disabled or when this transaction is not sampled
-					if (config('elastic-apm.active') !== true || config('elastic-apm.spans.httplog.enabled') !== true || !self::$isSampled) {
-						return;
-					}
+    /**
+     * @return callable
+     */
+    public static function getGuzzleMiddleware() : callable
+    {
+        return Middleware::tap(
+            function(RequestInterface $request, array $options) {
+                self::$lastHttpRequestStart = microtime(true);
+            },
+            function (RequestInterface $request, array $options, PromiseInterface $promise) {
+                // leave early if monitoring is disabled or when this transaction is not sampled
+                if (config('elastic-apm.active') !== true || config('elastic-apm.spans.httplog.enabled') !== true || !self::$isSampled) {
+                    return;
+                }
 
-					/* @var $response \GuzzleHttp\Psr7\Response */
-					try {
-						$response = $promise->wait(true);
-					}
-					catch (RequestException $ex) {
-						$response = $ex->getResponse();
-					}
+                /* @var $response \GuzzleHttp\Psr7\Response */
+                try {
+                    $response = $promise->wait(true);
+                }
+                catch (RequestException $ex) {
+                    $response = $ex->getResponse();
+                }
 
-					$requestTime = (microtime(true) - self::$lastHttpRequestStart) * 1000; // in miliseconds
+                $requestTime = (microtime(true) - self::$lastHttpRequestStart) * 1000; // in miliseconds
 
-					$method = $request->getMethod();
-					$host = $request->getUri()->getHost();
+                $method = $request->getMethod();
+                $host = $request->getUri()->getHost();
 
-					$requestEntry = [
-						// e.g. GET foo.example.net
-						'name' => "{$method} {$host}",
-						'type' => 'external',
-						'subtype' => 'http',
+                $requestEntry = [
+                    // e.g. GET foo.example.net
+                    'name' => "{$method} {$host}",
+                    'type' => 'external',
+                    'subtype' => 'http',
 
-						'start' => round(microtime(true) - $requestTime / 1000, 3),
-						'duration' => round($requestTime, 3),
+                    'start' => round(microtime(true) - $requestTime / 1000, 3),
+                    'duration' => round($requestTime, 3),
 
-						'context' => [
-							"http" => [
-								// https://www.elastic.co/guide/en/apm/server/current/span-api.html
-								"method" => $request->getMethod(),
-								"url" => $request->getUri()->__toString(),
-								'status_code' => $response ? $response->getStatusCode() : 0,
-							]
-						]
-					];
+                    'context' => [
+                        "http" => [
+                            // https://www.elastic.co/guide/en/apm/server/current/span-api.html
+                            "method" => $request->getMethod(),
+                            "url" => $request->getUri()->__toString(),
+                            'status_code' => $response ? $response->getStatusCode() : 0,
+                        ]
+                    ]
+                ];
 
-					app('apm-spans-log')->push($requestEntry);
-				}
-			);
-		}
+                app('apm-spans-log')->push($requestEntry);
+            }
+        );
+    }
 }

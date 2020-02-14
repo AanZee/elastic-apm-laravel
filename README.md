@@ -4,6 +4,15 @@ Laravel package of the https://github.com/philkra/elastic-apm-php-agent library,
 Tested with Laravel `5.7.*` and the philkra/elastic-apm-php-agent version `7.x`.
 
 ## [Install](https://packagist.org/packages/bethinkpl/elastic-apm-laravel)
+Add the following lines to the `repositories` array in your `composer.json` file.
+```
+{
+    "type": "vcs",
+    "url": "https://github.com/AanZee/elastic-apm-laravel"
+},
+```
+
+After you've added these lines you can require the package with the following command:
 ```
 composer require bethinkpl/elastic-apm-laravel
 ```

@@ -17,7 +17,9 @@ class Span
     private $collection;
 
     private $name = 'Transaction Span';
-    private $type = 'app.span';
+    private $type = 'db';
+    private $subtype = '';
+    private $action = '';
 
     private $start;
 
@@ -39,13 +41,25 @@ class Span
         $this->type = $type;
     }
 
+    public function setSubtype(string $subtype)
+    {
+        $this->subtype = $subtype;
+    }
+
+    public function setAction(string $action)
+    {
+        $this->action = $action;
+    }
+
     public function end()
     {
         $duration = round($this->timer->getElapsedInMilliseconds() - $this->start, 3);
         $this->collection->push([
             'name' => $this->name,
             'type' => $this->type,
-            'start' => $this->start,
+            'subtype' => $this->subtype,
+            'action' => $this->action,
+            'start' => round(microtime(true) - ($duration / 1000), 3),
             'duration' => $duration,
         ]);
     }

@@ -67,23 +67,26 @@ class RecordTransaction
 
         foreach (app('apm-spans-log')->toArray() as $spanContext) {
             // @see https://www.elastic.co/guide/en/apm/server/master/exported-fields-apm-span.html
-            $spanDb = new Span($spanContext['name'], $transaction);
-            $spanDb->setType($spanContext['type']);
-            $spanDb->setSubtype($spanContext['subtype']);
-            $spanDb->setContext($spanContext['context']);
+            $spanDb = new Span(array_get($spanContext, 'name', ''), $transaction);
+
+            $spanDb->setType(array_get($spanContext, 'type', ''));
+            $spanDb->setSubtype(array_get($spanContext, 'subtype', ''));
+
+            // The context is required and needs to be a filled array.
+            $spanDb->setContext(array_get($spanContext, 'context', [ "no-context" => [] ]));
 
             // optiponal fields
             if (isset($spanContext['action'])) {
                 $spanDb->setAction($spanContext['action']);
             }
+
             if (isset($spanContext['stacktrace'])) {
                 $spanDb->setStacktrace($spanContext['stacktrace']->toArray());
             }
 
             $spanDb->start();
-            $spanDb->stop($spanContext['duration']); // in [ms]
-
-            $spanDb->setStart($spanContext['start']); // in [us]
+            $spanDb->stop(array_get($spanContext, 'duration', 0)); // in [ms]
+            $spanDb->setStart(array_get($spanContext, 'start', 0)); // in [us]
 
             $this->agent->putEvent($spanDb);
         }
@@ -91,8 +94,7 @@ class RecordTransaction
         if (config('elastic-apm.transactions.use_route_uri')) {
             if (config('elastic-apm.transactions.normalize_uri')) {
                 $transaction->setTransactionName($this->getNormalizedTransactionName($request));
-            }
-            else {
+            } else {
                 $transaction->setTransactionName($this->getRouteUriTransactionName($request));
             }
         }
@@ -106,7 +108,6 @@ class RecordTransaction
         }
 
         $transaction->setTags(['requested_by' => $requestedBy]);
-
         $transaction->stop($this->timer->getElapsedInMilliseconds());
 
         return $response;
