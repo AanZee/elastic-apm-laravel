@@ -88,17 +88,32 @@ pending
 
 ### Laravel
 
-In `app/Exceptions/Handler`, add the following to the `report` method:
+In `app/Exceptions/Handler`, add the following to the `report` method before the `parent::report($exception)` line:
 
 ```php
-ElasticApm::captureThrowable($exception);
-ElasticApm::send();
+// Stop the APM transaction to log everything correctly
+$agent = app('elastic-apm');
+$agent->captureThrowable($exception);
+
+// Stop transaction can throw exceptions when the transaction is not found
+// To avoid the error logging / reporting not working correctly we try/catch it
+try {
+    $transactionName = sprintf(
+        "%s %s",
+        request()->server->get('REQUEST_METHOD'),
+        (request()->server->get('REQUEST_URI') == '') ? '/' : request()->server->get('REQUEST_URI')
+    );
+
+    $agent->stopTransaction($transactionName);
+} catch (Exception $e) {
+    // Just continue but log the error
+    Log::error($e);
+}
 ```
 
-Make sure to import the facade at the top of your file:
-
+Make sure to import the `Log` facade at the top of your file. Everything else should work out of the box.
 ```php
-use ElasticApm;
+use Log;
 ```
 
 ### Lumen
