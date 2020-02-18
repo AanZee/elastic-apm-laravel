@@ -101,7 +101,7 @@ try {
     $transactionName = sprintf(
         "%s %s",
         request()->server->get('REQUEST_METHOD'),
-        (request()->server->get('REQUEST_URI') == '') ? '/' : request()->server->get('REQUEST_URI')
+        (!is_null(Route::current()) ? Route::current()->uri : ((request()->getPathInfo() == '') ? '/' : request()->getPathInfo()))
     );
 
     $agent->stopTransaction($transactionName);

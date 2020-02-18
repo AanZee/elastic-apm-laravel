@@ -3,6 +3,7 @@
 namespace PhilKra\ElasticApmLaravel\Middleware;
 
 use Closure;
+use Route;
 use Illuminate\Support\Facades\Log;
 use PhilKra\Agent;
 use PhilKra\ElasticApmLaravel\Events\Span;
@@ -138,13 +139,10 @@ class RecordTransaction
      */
     protected function getTransactionName(\Illuminate\Http\Request $request): string
     {
-        // fix leading /
-        $path = ($request->server->get('REQUEST_URI') == '') ? '/' : $request->server->get('REQUEST_URI');
-
         return sprintf(
             "%s %s",
             $request->server->get('REQUEST_METHOD'),
-            $path
+            $this->getPath()
         );
     }
 
@@ -155,12 +153,26 @@ class RecordTransaction
      */
     protected function getRouteUriTransactionName(\Illuminate\Http\Request $request): string
     {
-        $path = ($request->path() === '/') ? '' : $request->path();
-
         return sprintf(
             "%s /%s",
             $request->server->get('REQUEST_METHOD'),
-            $path
+            $this->getPath()
+        );
+    }
+
+    /**
+     * @return string
+     */
+    protected function getPath(): string
+    {
+        return (
+            !is_null(Route::current())
+                ? Route::current()->uri
+                : (
+                    (request()->getPathInfo() == '')
+                        ? '/'
+                        : request()->getPathInfo()
+                )
         );
     }
 
