@@ -15,8 +15,10 @@ use PhilKra\Agent;
 use PhilKra\ElasticApmLaravel\Apm\SpanCollection;
 use PhilKra\ElasticApmLaravel\Apm\Transaction;
 use PhilKra\ElasticApmLaravel\Contracts\VersionResolver;
+use PhilKra\Helper\DistributedTracing;
 use PhilKra\Helper\Timer;
 use GuzzleHttp\Middleware;
+use PhilKra\Stores\TransactionsStore;
 use Psr\Http\Message\RequestInterface;
 
 class ElasticApmServiceProvider extends ServiceProvider
@@ -31,6 +33,9 @@ class ElasticApmServiceProvider extends ServiceProvider
 
     /** @var bool */
     private static $isSampled = true;
+
+    /** @var TransactionsStore */
+    private static $transactionsStore;
 
     /**
      * Bootstrap the application services.
@@ -67,6 +72,7 @@ class ElasticApmServiceProvider extends ServiceProvider
         // apply transactions reporting sampling
         $samplingRate = intval(config('elastic-apm.sampling')) ?: 100;
         self::$isSampled = $samplingRate > mt_rand(0, 100);
+        self::$transactionsStore = new TransactionsStore();
 
         $this->app->singleton(Agent::class, function ($app) {
             return new Agent(
@@ -82,7 +88,10 @@ class ElasticApmServiceProvider extends ServiceProvider
                     $this->getAppConfig(),
                     config('elastic-apm.env'),
                     config('elastic-apm.server')
-                )
+                ),
+                [],
+                null,
+                self::$transactionsStore
             );
         });
 
@@ -279,6 +288,20 @@ class ElasticApmServiceProvider extends ServiceProvider
 
             app('apm-spans-log')->push($query);
         });
+    }
+
+    public static function getGuzzleDistributedTracingMiddleware(): callable
+    {
+        return Middleware::mapRequest(function (RequestInterface $request) {
+            // add header of the current transaction
+            $transactions = self::$transactionsStore->list(key(self::$transactionsStore->list()));
+
+            reset($transactions);
+            $transaction = $transactions[key($transactions)];
+
+            $headerValue = new DistributedTracing($transaction->getTraceId(), $transaction->getParentId(), "01");
+            return $request->withAddedHeader( DistributedTracing::HEADER_NAME, (string) $headerValue);
+        }, 'add_traceparent');
     }
 
     /**
