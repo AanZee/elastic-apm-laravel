@@ -290,17 +290,37 @@ class ElasticApmServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Retrieves the current running transaction, used to retrieve the parentTraceID
+     * @return mixed
+     */
+    protected static function getCurrentTransaction() {
+        $transactions = self::$transactionsStore->list(key(self::$transactionsStore->list()));
+
+        reset($transactions);
+        return $transactions[key($transactions)];
+    }
+
     public static function getGuzzleDistributedTracingMiddleware(): callable
     {
         return Middleware::mapRequest(function (RequestInterface $request) {
-            // add header of the current transaction
-            $transactions = self::$transactionsStore->list(key(self::$transactionsStore->list()));
+            $transaction = self::getCurrentTransaction();
 
-            reset($transactions);
-            $transaction = $transactions[key($transactions)];
+            // The tracing header format is similar to: 00-441b95412c780b81a5cb8d6ad6de8415-9a58c89636dedfc6-01
 
-            $headerValue = new DistributedTracing($transaction->getTraceId(), $transaction->getParentId(), "01");
-            return $request->withAddedHeader( DistributedTracing::HEADER_NAME, (string) $headerValue);
+            // This based on the following standard: https://www.w3.org/TR/trace-context/#traceparent-header
+            // - first value is the version, 00 signifies default
+            // - second value is the traceId, signifying which original transaction it belongs to
+            // - third value is the parentId, which signifies the span in which the coming transaction takes place in.
+            // - fourth value contains flags, simply set it to 01 signifying that we want it sampled.
+
+            // Only add the header if everything is valid
+            if($transaction && $transaction->getTraceId() && $transaction->getParentId()) {
+                $headerValue = new DistributedTracing($transaction->getTraceId(), $transaction->getParentId(), "01");
+                return $request->withAddedHeader( DistributedTracing::HEADER_NAME, (string) $headerValue);
+            } else {
+                return $request;
+            }
         }, 'add_traceparent');
     }
 
