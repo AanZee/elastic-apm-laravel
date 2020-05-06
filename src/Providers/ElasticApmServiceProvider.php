@@ -304,7 +304,12 @@ class ElasticApmServiceProvider extends ServiceProvider
     public static function getGuzzleDistributedTracingMiddleware(): callable
     {
         return Middleware::mapRequest(function (RequestInterface $request) {
-            $transaction = self::getCurrentTransaction();
+            try{
+                $transaction = self::getCurrentTransaction();
+            } catch (Exception $e) {
+                // No transaction is found for whatever reason, it should simply fall back to the regular request
+                return $request;
+            }
 
             // The tracing header format is similar to: 00-441b95412c780b81a5cb8d6ad6de8415-9a58c89636dedfc6-01
 
