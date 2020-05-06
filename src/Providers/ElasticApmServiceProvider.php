@@ -298,7 +298,7 @@ class ElasticApmServiceProvider extends ServiceProvider
         $transactions = self::$transactionsStore->list(key(self::$transactionsStore->list()));
 
         reset($transactions);
-        return $transactions[key($transactions)];
+        return Arr::get($transactions, key($transactions), null);
     }
 
     public static function getGuzzleDistributedTracingMiddleware(): callable
